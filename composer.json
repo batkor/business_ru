@@ -1,0 +1,19 @@
+{
+  "name": "batkor/business-ru",
+  "description": "Api for business.ru",
+  "license": "GPL-2.0-or-later",
+  "authors": [
+    {
+      "name": "batkor",
+      "email": "info@batkor.ru"
+    }
+  ],
+  "autoload":{
+    "psr-4":{
+      "Business\\":"src"
+    }
+  },
+  "require": {
+
+  }
+}
