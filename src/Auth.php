@@ -2,17 +2,20 @@
 
 namespace Business;
 
-use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Uri;
-use Http\Client\HttpClient;
+use Http\Client\Exception\RequestException;
+use Psr\Http\Client\ClientInterface;
 
 /**
  * Provides authorization mechanical for BusinessApi.
  */
 class Auth
 {
-    const REPAIR_PATH = '/api/rest/repair.json';
+    /**
+     * The path for repair token.
+     */
+    public const REPAIR_PATH = '/api/rest/repair.json';
 
     /**
      * The API key.
@@ -38,56 +41,137 @@ class Auth
     /**
      * The host.
      *
+     * Your account domain https://myaccount.business.ru.
+     *
      * @var string
      */
     private $host;
 
-  /**
-   * The token key.
-   *
-   * @var string
-   */
+    /**
+     * The token key.
+     *
+     * @var string
+     */
     private $token;
 
-    public function __construct($appId, $secret, $host)
+    /**
+     * The http client.
+     *
+     * @var \Psr\Http\Client\ClientInterface
+     */
+    private $client;
+
+    public function __construct(ClientInterface $client, $appId, $secret, $host, $token = null)
     {
+        $this->client = $client;
         $this->appId = $appId;
         $this->secret = $secret;
         $this->host = rtrim($host, '/');
-        $this->generateAppPsw();
+
+        if ($token) {
+            $this->token = $token;
+        }
     }
 
-    public function repair(HttpClient $client)
+    /**
+     * Repair api token.
+     *
+     * @throws \Psr\Http\Client\ClientExceptionInterface
+     *
+     * @see https://developers.business.ru/api-polnoe/poterya_tokena_i_ego_vosstanovlenie/366
+     */
+    public function repair()
     {
         $request = new Request('GET', $this->uri(), ['Content-Type' => 'application/json']);
-        $response = $client->sendRequest($request);
-        $result = json_decode($response->getBody()->getContents(), TRUE);
-        $app_psw = $result[ 'app_psw' ];
-        unset( $result[ 'app_psw' ] );
+        $response = $this->client->sendRequest($request);
+        $result = json_decode($response->getBody()->getContents(), true);
+        $app_psw = $result['app_psw'];
+        unset($result['app_psw']);
         if (md5($this->secret . json_encode($result)) !== $app_psw) {
-          throw new BadResponseException('Authorization error', $request);
+            throw new RequestException('Authorization error', $request);
         }
         $this->token = $result['token'];
     }
 
-    public function token() {
-      return $this->token;
+    public function secret()
+    {
+        return $this->secret;
     }
 
-    private function uri(): Uri {
+    public function appId()
+    {
+        return $this->appId;
+    }
+
+    /**
+     * Returns token.
+     *
+     * @return string
+     *   The token.
+     */
+    public function token()
+    {
+        if ($this->token) {
+            return $this->token;
+        }
+        $this->repair();
+
+        return $this->token;
+    }
+
+    /**
+     * Returns host.
+     *
+     * @return string
+     *   The host domain.
+     */
+    public function host()
+    {
+        return $this->host;
+    }
+
+    public function checkAppPws(array $result)
+    {
+
+    }
+
+    /**
+     * Returns uri for get token request.
+     *
+     * @return \GuzzleHttp\Psr7\Uri
+     *   The uri object.
+     */
+    private function uri(): Uri
+    {
         $uri = new Uri($this->host . self::REPAIR_PATH);
         $params = [
-          'app_id' => $this->appId,
+            'app_id' => $this->appId,
+            'app_psw' => $this->appPsw(),
         ];
-        $params['app_psw'] = md5($this->secret . http_build_query($params));
+
         return $uri->withQuery(http_build_query($params));
     }
 
-    private function generateAppPsw() {
-        $this->appPsw = md5($this->secret . http_build_query([
-            'app_id' => $this->appId,
-          ])
+    /**
+     * Returns app_psw value.
+     *
+     * @return string
+     *   The app_pws value.
+     */
+    private function appPsw()
+    {
+        if ($this->appPsw) {
+            return $this->appPsw;
+        }
+        $this->appPsw = md5(
+            $this->secret . http_build_query(
+                [
+                    'app_id' => $this->appId,
+                ]
+            )
         );
+
+        return $this->appPsw;
     }
 
 }

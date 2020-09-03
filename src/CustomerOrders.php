@@ -2,18 +2,24 @@
 
 namespace Business;
 
-class CustomerOrders
+class CustomerOrders extends ClientApi
 {
-    /**
-     * The authentication credentials.
-     *
-     * @var \Business\Auth
-     */
-    private $auth;
 
-    public function __construct(Auth $auth)
+    public function get(array $params = [])
     {
-        $this->auth = $auth;
+        return $this->request('get', $params);
     }
 
+    public function create(array $params = [])
+    {
+        return $this->request('post', $params);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function path()
+    {
+        return '/api/rest/customerorders.json';
+    }
 }
